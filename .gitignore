@@ -1,4 +1,4 @@
 *
 !passes/
-!passes/PCPParallization.cpp
+!passes/LoopParallelization.cpp
 !README.md

@@ -233,7 +233,7 @@ namespace {
         return V;
     }
 
-    struct PCPParallization : PassInfoMixin<PCPParallization> {
+    struct LoopParallelization : PassInfoMixin<LoopParallelization> {
         PreservedAnalyses run(Loop &L, LoopAnalysisManager &LAM,
                               LoopStandardAnalysisResults &AR, LPMUpdater &U) {
             if (!L.getSubLoops().empty()) {
@@ -302,8 +302,8 @@ llvm::PassPluginLibraryInfo getParallelizePassInfo() {
         PB.registerPipelineParsingCallback(
                 [&](StringRef name, LoopPassManager &LPM,
                     ArrayRef<PassBuilder::PipelineElement>) {
-                    if (name == "pcp-parallizer") {
-                        LPM.addPass(PCPParallization());
+                    if (name == "loop-parallelization") {
+                        LPM.addPass(LoopParallelization());
                         return true;
                     }
                     return false;
