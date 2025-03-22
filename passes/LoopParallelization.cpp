@@ -332,7 +332,7 @@ llvm::PassPluginLibraryInfo getParallelizePassInfo() {
                     return false;
                 });
     };
-    return {LLVM_PLUGIN_API_VERSION, "PCPParallizer", LLVM_VERSION_STRING, callback};
+    return {LLVM_PLUGIN_API_VERSION, "LoopParallelization", LLVM_VERSION_STRING, callback};
 }
 
 extern "C" LLVM_ATTRIBUTE_WEAK PassPluginLibraryInfo llvmGetPassPluginInfo() {
