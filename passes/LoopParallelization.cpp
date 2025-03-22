@@ -233,6 +233,12 @@ namespace {
         return V;
     }
 
+    bool isSafeParallelizable(const ArrayAccess& access1, const ArrayAccess& access2) {
+        // TODO: implement the four tests
+        // return test1(access1, access2) || test2(access1, access2) || test3(access1, access2) || test4(access1, access2);
+        return true;
+    }
+
     struct LoopParallelization : PassInfoMixin<LoopParallelization> {
         PreservedAnalyses run(Loop &L, LoopAnalysisManager &LAM,
                               LoopStandardAnalysisResults &AR, LPMUpdater &U) {
@@ -247,6 +253,7 @@ namespace {
             auto [bounds, inductionVars] = extractParentLoopBounds(&L, SE, /* print = */ false);
 
             std::unordered_map<Value*, Value*> baseMap;
+            std::vector<ArrayAccess> arrayAccesses;
 
             for (BasicBlock *BB : L.blocks()) {
                 for (Instruction &I : *BB)
@@ -263,6 +270,7 @@ namespace {
                             ArrayIndexAccess arrayIndexAccess = extractArrayIndexAccess(access, inductionVars, bounds);
                             arrayAccess.arrayIndexAccesses.push_back(arrayIndexAccess);
                         }
+                        arrayAccesses.push_back(arrayAccess);
                         printArrayAccess(arrayAccess);
                     }
                     else if (auto *Load = dyn_cast<LoadInst>(&I))
@@ -277,6 +285,7 @@ namespace {
                             ArrayIndexAccess arrayIndexAccess = extractArrayIndexAccess(access, inductionVars, bounds);
                             arrayAccess.arrayIndexAccesses.push_back(arrayIndexAccess);
                         }
+                        arrayAccesses.push_back(arrayAccess);
                         printArrayAccess(arrayAccess);
                     }
                     else if (auto *GEP = dyn_cast<GetElementPtrInst>(&I))
@@ -286,6 +295,20 @@ namespace {
                         baseMap[GEP] = base;
                     }
                 }
+            }
+
+            bool isParallelizable = true;
+            for (int i = 0; i < arrayAccesses.size(); ++i) {
+                for (int j = i + 1; j < arrayAccesses.size(); ++j) {
+                    if (arrayAccesses[i].baseAccess == arrayAccesses[j].baseAccess &&
+                            (arrayAccesses[i].type || arrayAccesses[j].type)) {
+                        isParallelizable &= isSafeParallelizable(arrayAccesses[i], arrayAccesses[j]);
+                    }
+                }
+            }
+
+            if (isParallelizable) {
+                errs() << "Loop is safe to be parallelized" << "\n";
             }
 
             errs() << "==============================\n";
