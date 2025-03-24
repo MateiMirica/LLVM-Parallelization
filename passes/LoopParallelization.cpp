@@ -397,7 +397,6 @@ namespace {
 
         for(int i = 0;i < access1.arrayIndexAccesses.size(); i++)
         {
-            gcd = -1;
             auto linearCombination1 = arrayIndexAccesses1[i].linearCombination;
             auto linearCombination2 = arrayIndexAccesses2[i].linearCombination;
             int freeRemainingCoef = arrayIndexAccesses2[i].freeCoef - arrayIndexAccesses1[i].freeCoef;
