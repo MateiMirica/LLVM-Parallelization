@@ -282,10 +282,63 @@ namespace {
         return V;
     }
 
+    /*
+     * Check if access1[index].linear_combination - access2[index].linear_combination contain 0 on all dimensions.
+     * Return true if there is a dimension where 0 is not covered -> there is no dependency.
+     */
+    bool BanerjeeTest(const ArrayAccess& access1, const ArrayAccess& access2) {
+        for (int index = 0; index < access1.arrayIndexAccesses.size(); ++index) {
+            ArrayIndexAccess indexAccess1 = access1.arrayIndexAccesses[index];
+            ArrayIndexAccess indexAccess2 = access2.arrayIndexAccesses[index];
+            int lb = indexAccess1.freeCoef - indexAccess2.freeCoef, ub = indexAccess1.freeCoef - indexAccess2.freeCoef;
+            std::vector<IndexAccess> linear_difference;
+            bool unknown_boundary = false;
+            for (int i = 0; i < indexAccess1.linearCombination.size() - 1; ++i) {
+                int coef = indexAccess1.linearCombination[i].coef - indexAccess2.linearCombination[i].coef;
+                linear_difference.push_back({indexAccess1.linearCombination[i].bounds, coef});
+            }
+            if (indexAccess1.linearCombination.size() > 0) {
+                int last_index = indexAccess1.linearCombination.size() - 1;
+                int coef = indexAccess1.linearCombination[last_index].coef;
+                linear_difference.push_back({indexAccess1.linearCombination[last_index].bounds, coef});
+
+                coef = -indexAccess2.linearCombination[last_index].coef;
+                linear_difference.push_back({indexAccess2.linearCombination[last_index].bounds, coef});
+            }
+            for (auto index_bound : linear_difference) {
+                if (index_bound.coef != 0) {
+                    if (!index_bound.bounds.isKnown) {
+                        unknown_boundary = true;
+                        break;
+                    }
+                    int delta_lb = index_bound.coef * index_bound.bounds.lowerBound, delta_ub = index_bound.coef * index_bound.bounds.upperBound;
+                    lb += std::min(delta_lb, delta_ub);
+                    ub += std::max(delta_lb, delta_ub);
+                }
+            }
+            if (unknown_boundary)
+                continue;
+            if (ub < 0 || lb > 0)
+                return true;
+        }
+        return false;
+    }
+
+    bool test2(const ArrayAccess& access1, const ArrayAccess& access2) {
+        return false;
+    }
+
+    bool test3(const ArrayAccess& access1, const ArrayAccess& access2) {
+        return false;
+    }
+
+    bool test4(const ArrayAccess& access1, const ArrayAccess& access2) {
+        return false;
+    }
+
     bool isSafeParallelizable(const ArrayAccess& access1, const ArrayAccess& access2) {
         // TODO: implement the four tests
-        // return test1(access1, access2) || test2(access1, access2) || test3(access1, access2) || test4(access1, access2);
-        return true;
+         return BanerjeeTest(access1, access2) || test2(access1, access2) || test3(access1, access2) || test4(access1, access2);
     }
 
     struct LoopParallelization : PassInfoMixin<LoopParallelization> {
