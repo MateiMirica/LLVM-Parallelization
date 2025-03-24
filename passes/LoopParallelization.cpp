@@ -388,7 +388,45 @@ namespace {
         return true;
     }
 
-    bool test3(const ArrayAccess& access1, const ArrayAccess& access2) {
+    bool GCDTest(const ArrayAccess& access1, const ArrayAccess& access2) {
+        auto arrayIndexAccesses1 = access1.arrayIndexAccesses;
+        auto arrayIndexAccesses2 = access2.arrayIndexAccesses;
+        unsigned int currentIndex = arrayIndexAccesses1.size();
+        std::vector<int> coefficients;
+        int gcd;
+
+        for(int i = 0;i < access1.arrayIndexAccesses.size(); i++)
+        {
+            gcd = -1;
+            auto linearCombination1 = arrayIndexAccesses1[i].linearCombination;
+            auto linearCombination2 = arrayIndexAccesses2[i].linearCombination;
+            int freeRemainingCoef = arrayIndexAccesses2[i].freeCoef - arrayIndexAccesses1[i].freeCoef;
+
+            for(int j = 0;j < access1.arrayIndexAccesses[i].linearCombination.size();j++)
+            {
+                if (j == currentIndex)
+                {
+                    if (linearCombination1[j].coef != 0)
+                        coefficients.push_back(linearCombination1[j].coef);
+                    if (linearCombination2[j].coef != 0)
+                        coefficients.push_back(linearCombination2[j].coef);
+                }
+                else
+                {
+                    int remainingCoef = linearCombination1[j].coef - linearCombination2[j].coef;
+                    if (remainingCoef != 0)
+                        coefficients.push_back(remainingCoef);
+                }
+            }
+            if (!coefficients.empty())
+                gcd = coefficients[0];
+            for(int j = 1; j < coefficients.size();j++)
+            {
+                gcd = std::gcd(gcd, coefficients[j]);
+            }
+            if (freeRemainingCoef % gcd != 0)
+                return true;
+        }
         return false;
     }
 
@@ -399,7 +437,7 @@ namespace {
     bool isSafeParallelizable(const ArrayAccess& access1, const ArrayAccess& access2) {
         // TODO: implement the four tests
          return BanerjeeTest(access1, access2) || StrongSIVTest(access1, access2) || SameAccess(access1, access2)
-                    || test3(access1, access2) || test4(access1, access2);
+                    || GCDTest(access1, access2) || test4(access1, access2);
     }
 
     struct LoopParallelization : PassInfoMixin<LoopParallelization> {
@@ -474,6 +512,10 @@ namespace {
 
             if (isParallelizable) {
                 errs() << "Loop is safe to be parallelized" << "\n";
+            }
+            else
+            {
+                errs() << "Loop is not safe to be parallelized" << "\n";
             }
 
             errs() << "==============================\n";
