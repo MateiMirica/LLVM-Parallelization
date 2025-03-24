@@ -373,6 +373,21 @@ namespace {
         return false;
     }
 
+
+    bool SameAccess(const ArrayAccess& access1, const ArrayAccess& access2) {
+        for (int index = 0; index < access1.arrayIndexAccesses.size(); ++index) {
+            ArrayIndexAccess indexAccess1 = access1.arrayIndexAccesses[index];
+            ArrayIndexAccess indexAccess2 = access2.arrayIndexAccesses[index];
+            if (indexAccess1.freeCoef != indexAccess2.freeCoef)
+                return false;
+            for (int i = 0; i < indexAccess1.linearCombination.size(); ++i) {
+                if (indexAccess1.linearCombination[i].coef != indexAccess2.linearCombination[i].coef)
+                    return false;
+            }
+        }
+        return true;
+    }
+
     bool test3(const ArrayAccess& access1, const ArrayAccess& access2) {
         return false;
     }
@@ -383,7 +398,8 @@ namespace {
 
     bool isSafeParallelizable(const ArrayAccess& access1, const ArrayAccess& access2) {
         // TODO: implement the four tests
-         return BanerjeeTest(access1, access2) || StrongSIVTest(access1, access2) || test3(access1, access2) || test4(access1, access2);
+         return BanerjeeTest(access1, access2) || StrongSIVTest(access1, access2) || SameAccess(access1, access2)
+                    || test3(access1, access2) || test4(access1, access2);
     }
 
     struct LoopParallelization : PassInfoMixin<LoopParallelization> {
