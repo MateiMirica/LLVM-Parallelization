@@ -357,7 +357,7 @@ namespace {
                 int last_index = indexAccess1.linearCombination.size() - 1;
                 int coef1 = indexAccess1.linearCombination[last_index].coef;
                 int coef2 = indexAccess2.linearCombination[last_index].coef;
-                if (coef1 != coef2)
+                if (coef1 != coef2 || coef1 == 0)
                     continue;
                 if (free_coef % coef1 != 0)
                     return true;
