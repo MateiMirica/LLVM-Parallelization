@@ -72,47 +72,96 @@ namespace {
         return "UnknownExpr";
     }
 
-    void processGEPOperator(GEPOperator *GEPOp, ScalarEvolution &SE, std::vector<std::string>& accesses) {
-        if (auto *InnerGEPOp = dyn_cast<GEPOperator>(GEPOp->getPointerOperand())) {
-            processGEPOperator(InnerGEPOp, SE, accesses);
+    ArrayType* extractTopLevelArrayType(Value *V) {
+        Type *ty = nullptr;
+        if (auto *GV = dyn_cast<GlobalVariable>(V)) {
+            ty = GV->getValueType();
+        } else if (auto *AI = dyn_cast<AllocaInst>(V)) {
+            ty = AI->getAllocatedType();
         }
+        if (!ty)
+            return nullptr;
+        return dyn_cast<ArrayType>(ty);
+    }
+
+    int countArrayDimensions(Type *ty) {
+        int dims = 0;
+        while (auto *arrayTy = dyn_cast<ArrayType>(ty)) {
+            dims++;
+            ty = arrayTy->getElementType();
+        }
+        return dims;
+    }
+
+    void processGEPOperator(GEPOperator *GEPOp, ScalarEvolution &SE, std::vector<std::string>& accesses, int& totalDims) {
+        Type *targetTy = GEPOp->getSourceElementType();
+        int dims = countArrayDimensions(targetTy);
+
+        if (auto *InnerGEPOp = dyn_cast<GEPOperator>(GEPOp->getPointerOperand())) {
+            processGEPOperator(InnerGEPOp, SE, accesses, totalDims);
+        }
+
+        int toAdd = totalDims - dims;
+        while (toAdd > 0) {
+            accesses.push_back("0");
+            toAdd--;
+        }
+
+        totalDims = dims;
 
         for (unsigned idx = 2; idx < GEPOp->getNumOperands(); ++idx) {
             Value *IndexVal = GEPOp->getOperand(idx);
             const SCEV *IndexScev = SE.getSCEV(IndexVal);
             accesses.push_back(extractEquation(IndexScev, SE));
+            totalDims--;
         }
     }
 
-    void extractGEPIndices(GetElementPtrInst *GEP, ScalarEvolution &SE, std::vector<std::string>& accesses) {
+    void extractGEPIndices(GetElementPtrInst *GEP, ScalarEvolution &SE, std::vector<std::string>& accesses, int& totalDims) {
+        Type *targetTy = GEP->getSourceElementType();
+        int dims = countArrayDimensions(targetTy);
         if (auto *GEPOp = dyn_cast<GEPOperator>(GEP->getPointerOperand())) {
-            processGEPOperator(GEPOp, SE, accesses);
+            processGEPOperator(GEPOp, SE, accesses, totalDims);
         }
+
+        int toAdd = totalDims - dims;
+        while (toAdd > 0) {
+            accesses.push_back("0");
+            toAdd--;
+        }
+
+        totalDims = dims;
 
         for (unsigned idx = 2; idx < GEP->getNumOperands(); ++idx) {
             Value *IndexVal = GEP->getOperand(idx);
             const SCEV *IndexScev = SE.getSCEV(IndexVal);
             accesses.push_back(extractEquation(IndexScev, SE));
+            totalDims--;
         }
     }
 
-    std::vector<std::string> extractArrayIndexAccess(Value* ptrOperand, ScalarEvolution &SE, bool print = false) {
+    std::vector<std::string> extractArrayIndexAccess(Value* ptrOperand, ScalarEvolution &SE, int& totalDims, bool print = false) {
         std::vector<std::string> accesses;
         if (auto *GEP = dyn_cast<GetElementPtrInst>(ptrOperand)) {
-            extractGEPIndices(GEP, SE, accesses);
+            extractGEPIndices(GEP, SE, accesses, totalDims);
         } else if (auto *GEPConst = dyn_cast<ConstantExpr>(ptrOperand)) {
             if (GEPConst->getOpcode() == Instruction::GetElementPtr) {
                 Instruction *TempGEP = GEPConst->getAsInstruction();
-                extractGEPIndices(cast<GetElementPtrInst>(TempGEP), SE, accesses);
+                extractGEPIndices(cast<GetElementPtrInst>(TempGEP), SE, accesses, totalDims);
                 TempGEP->deleteValue();
             }
         }
+        while (totalDims > 0) {
+            accesses.push_back("0");
+            totalDims--;
+        }
         if (print) {
-            for (std::string access: accesses)
+            for (const auto &access : accesses)
                 errs() << "  Accessing index: " << access << "\n";
         }
         return accesses;
     }
+
 
     Bounds extractConstantBound(std::string stringBound) {
         int sgn = 1, index = 0, value = 0;
@@ -260,9 +309,10 @@ namespace {
                 {
                     if (auto *Store = dyn_cast<StoreInst>(&I))
                     {
-                        Value *ptrOperand = Store->getOperand(1)->stripPointerCasts();
+                        Value *ptrOperand = Store->getOperand(1);
                         Value *base = getBasePointer(ptrOperand, baseMap);
-                        std::vector<std::string> accesses = extractArrayIndexAccess(ptrOperand, SE, /* print = */ false);
+                        int totalDims = countArrayDimensions(extractTopLevelArrayType(base));
+                        std::vector<std::string> accesses = extractArrayIndexAccess(ptrOperand, SE, totalDims, /* print = */ false);
                         ArrayAccess arrayAccess;
                         arrayAccess.baseAccess = base;
                         arrayAccess.type = false;
@@ -275,9 +325,10 @@ namespace {
                     }
                     else if (auto *Load = dyn_cast<LoadInst>(&I))
                     {
-                        Value *ptrOperand = Load->getOperand(0)->stripPointerCasts();
+                        Value *ptrOperand = Load->getOperand(0);
                         Value *base = getBasePointer(ptrOperand, baseMap);
-                        std::vector<std::string> accesses = extractArrayIndexAccess(ptrOperand, SE, /* print = */ false);
+                        int totalDims = countArrayDimensions(extractTopLevelArrayType(base));
+                        std::vector<std::string> accesses = extractArrayIndexAccess(ptrOperand, SE, totalDims, /* print = */ false);
                         ArrayAccess arrayAccess;
                         arrayAccess.baseAccess = base;
                         arrayAccess.type = true;
@@ -301,7 +352,7 @@ namespace {
             for (int i = 0; i < arrayAccesses.size(); ++i) {
                 for (int j = i + 1; j < arrayAccesses.size(); ++j) {
                     if (arrayAccesses[i].baseAccess == arrayAccesses[j].baseAccess &&
-                            (arrayAccesses[i].type || arrayAccesses[j].type)) {
+                            (!arrayAccesses[i].type || !arrayAccesses[j].type)) {
                         isParallelizable &= isSafeParallelizable(arrayAccesses[i], arrayAccesses[j]);
                     }
                 }
