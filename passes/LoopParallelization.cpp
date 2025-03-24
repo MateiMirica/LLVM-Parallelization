@@ -391,7 +391,7 @@ namespace {
     bool GCDTest(const ArrayAccess& access1, const ArrayAccess& access2) {
         auto arrayIndexAccesses1 = access1.arrayIndexAccesses;
         auto arrayIndexAccesses2 = access2.arrayIndexAccesses;
-        unsigned int currentIndex = arrayIndexAccesses1.size();
+        unsigned int currentIndex = arrayIndexAccesses1.size() - 1;
         std::vector<int> coefficients;
         int gcd;
 
@@ -418,26 +418,43 @@ namespace {
                         coefficients.push_back(remainingCoef);
                 }
             }
-            if (!coefficients.empty())
-                gcd = coefficients[0];
-            for(int j = 1; j < coefficients.size();j++)
+            gcd = 0;
+            for(int j = 0; j < coefficients.size();j++)
             {
                 gcd = std::gcd(gcd, coefficients[j]);
             }
-            if (freeRemainingCoef % gcd != 0)
+            if (gcd != 0 && freeRemainingCoef % gcd != 0)
                 return true;
         }
         return false;
     }
 
-    bool test4(const ArrayAccess& access1, const ArrayAccess& access2) {
+    bool ZIVTest(const ArrayAccess& access1, const ArrayAccess& access2)
+    {
+        auto arrayIndexAccesses1 = access1.arrayIndexAccesses;
+        auto arrayIndexAccesses2 = access2.arrayIndexAccesses;
+        bool onlyFreeCoefficients = true;
+        for(int i = 0;i < access1.arrayIndexAccesses.size(); i++)
+        {
+            auto linearCombination1 = arrayIndexAccesses1[i].linearCombination;
+            auto linearCombination2 = arrayIndexAccesses2[i].linearCombination;
+            for (int j = 0;j < linearCombination1.size();j++)
+            {
+                if (linearCombination1[j].coef != 0 || linearCombination2[j].coef != 0)
+                {
+                    onlyFreeCoefficients = false;
+                    break;
+                }
+            }
+            if (onlyFreeCoefficients == true && arrayIndexAccesses1[i].freeCoef != arrayIndexAccesses2[i].freeCoef)
+                return true;
+        }
         return false;
     }
 
     bool isSafeParallelizable(const ArrayAccess& access1, const ArrayAccess& access2) {
-        // TODO: implement the four tests
-         return BanerjeeTest(access1, access2) || StrongSIVTest(access1, access2) || SameAccess(access1, access2)
-                    || GCDTest(access1, access2) || test4(access1, access2);
+         return BanerjeeTest(access1, access2) || StrongSIVTest(access1, access2) || SameAccess(access1, access2) ||
+             GCDTest(access1, access2) || ZIVTest(access1, access2);
     }
 
     struct LoopParallelization : PassInfoMixin<LoopParallelization> {
