@@ -204,6 +204,7 @@ namespace {
             arrayIndexAccess.linearCombination = std::vector<IndexAccess>(inductionVars.size());
             for (int i = 0; i < arrayIndexAccess.linearCombination.size(); ++i)
                 arrayIndexAccess.linearCombination[i].bounds = bounds[i];
+
             while (index < string_access.size()) {
                 index += 3;
                 int coef = extractNumber(string_access, index);
@@ -265,6 +266,7 @@ namespace {
             printArrayIndexAccess(arrayIndexAccess);
             errs() << "\n";
         }
+        errs() << "\n";
     }
 
     static Value* getBasePointer(Value *V, std::unordered_map<Value*, Value*> &baseMap) {
@@ -282,10 +284,94 @@ namespace {
         return V;
     }
 
+    bool gcdTest(const ArrayAccess& access1, const ArrayAccess& access2 /*, int currentIndex */)
+    {
+        auto arrayIndexAccesses1 = access1.arrayIndexAccesses;
+        auto arrayIndexAccesses2 = access2.arrayIndexAccesses;
+        unsigned int currentIndex = arrayIndexAccesses1.size();
+        std::vector<int> coefficients;
+        int gcd;
+
+        for(int i = 0;i < access1.arrayIndexAccesses.size(); i++)
+        {
+            gcd = -1;
+            auto linearCombination1 = arrayIndexAccesses1[i].linearCombination;
+            auto linearCombination2 = arrayIndexAccesses2[i].linearCombination;
+            int freeRemainingCoef = arrayIndexAccesses2[i].freeCoef - arrayIndexAccesses1[i].freeCoef;
+
+            for(int j = 0;j < access1.arrayIndexAccesses[i].linearCombination.size();j++)
+            {
+                if (j == currentIndex)
+                {
+                    if (linearCombination1[j].coef != 0)
+                        coefficients.push_back(linearCombination1[j].coef);
+                    if (linearCombination2[j].coef != 0)
+                        coefficients.push_back(linearCombination2[j].coef);
+                }
+                else
+                {
+                    int remainingCoef = linearCombination1[j].coef - linearCombination2[j].coef;
+                    if (remainingCoef != 0)
+                        coefficients.push_back(remainingCoef);
+                }
+            }
+            if (!coefficients.empty())
+                gcd = coefficients[0];
+            for(int j = 1; j < coefficients.size();j++)
+            {
+                gcd = std::gcd(gcd, coefficients[j]);
+            }
+            if (freeRemainingCoef % gcd != 0 /* || (freeRemainingCoef != 0 && gcd == -1) -> Basically ZIV Test*/)
+                return true;
+        }
+        return false;
+    }
+
+    bool zivTest(const ArrayAccess& access1, const ArrayAccess& access2)
+    {
+        auto arrayIndexAccesses1 = access1.arrayIndexAccesses;
+        auto arrayIndexAccesses2 = access2.arrayIndexAccesses;
+
+        for(int i = 0;i < access1.arrayIndexAccesses.size(); i++)
+        {
+            auto linearCombination1 = arrayIndexAccesses1[i].linearCombination;
+            auto linearCombination2 = arrayIndexAccesses2[i].linearCombination;
+            for (int j = 0;j < linearCombination1.size();j++)
+            {
+                if (linearCombination1[j].coef != 0 || linearCombination2[j].coef != 0)
+                    return false; // ZIV cannot tell whether loop is parallelizable in this case
+            }
+            if (arrayIndexAccesses1[i].freeCoef != arrayIndexAccesses2[i].freeCoef)
+                return true;
+
+        }
+        return false;
+    }
+
+    int checkHowManyVariables(const ArrayAccess& access1, const ArrayAccess& access2)
+    {
+        int variables = 0;
+        auto arrayIndexAccesses1 = access1.arrayIndexAccesses;
+        auto arrayIndexAccesses2 = access2.arrayIndexAccesses;
+
+        for(int i = 0;i < access1.arrayIndexAccesses.size(); i++)
+        {
+            auto linearCombination1 = arrayIndexAccesses1[i].linearCombination;
+            auto linearCombination2 = arrayIndexAccesses2[i].linearCombination;
+            for (int j = 0;j < linearCombination1.size(); j++)
+            {
+                if (linearCombination1[j].coef != 0 || linearCombination2[j].coef != 0)
+                    variables++;
+            }
+        }
+        return true;
+    }
+
     bool isSafeParallelizable(const ArrayAccess& access1, const ArrayAccess& access2) {
         // TODO: implement the four tests
+
         // return test1(access1, access2) || test2(access1, access2) || test3(access1, access2) || test4(access1, access2);
-        return true;
+        return zivTest(access1, access2) || gcdTest(access1, access2);
     }
 
     struct LoopParallelization : PassInfoMixin<LoopParallelization> {
@@ -299,7 +385,7 @@ namespace {
 
             errs()<< "Analysing loop: " << L.getLocStr() << "\n";
 
-            auto [bounds, inductionVars] = extractParentLoopBounds(&L, SE, /* print = */ false);
+            auto [bounds, inductionVars] = extractParentLoopBounds(&L, SE, /* print = */ true);
 
             std::unordered_map<Value*, Value*> baseMap;
             std::vector<ArrayAccess> arrayAccesses;
@@ -360,6 +446,10 @@ namespace {
 
             if (isParallelizable) {
                 errs() << "Loop is safe to be parallelized" << "\n";
+            }
+            else
+            {
+                errs() << "Loop is not safe to be parallelized" << "\n";
             }
 
             errs() << "==============================\n";
