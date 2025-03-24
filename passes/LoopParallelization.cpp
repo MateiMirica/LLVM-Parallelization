@@ -433,9 +433,9 @@ namespace {
     {
         auto arrayIndexAccesses1 = access1.arrayIndexAccesses;
         auto arrayIndexAccesses2 = access2.arrayIndexAccesses;
-        bool onlyFreeCoefficients = true;
         for(int i = 0;i < access1.arrayIndexAccesses.size(); i++)
         {
+            bool onlyFreeCoefficients = true;
             auto linearCombination1 = arrayIndexAccesses1[i].linearCombination;
             auto linearCombination2 = arrayIndexAccesses2[i].linearCombination;
             for (int j = 0;j < linearCombination1.size();j++)
