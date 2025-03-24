@@ -324,7 +324,52 @@ namespace {
         return false;
     }
 
-    bool test2(const ArrayAccess& access1, const ArrayAccess& access2) {
+    /*
+     * Implement the strong SIV test. In a nested loop format:
+     * for (i1)
+     *  for (i2)
+     *  ..
+     *   for (in)
+     *     <LINEAR_COMBINATION_1 (i1, ..., i(n-1)) + a*in+c1, LINEAR_COMBINATION_2 (i1, ..., i(n-1)) + a*in'+c2>
+     * The last for loop (in) can be parallelized if:
+     *  1. LINEAR_COMBINATION_1 (i1, ..., i(n-1)) = LINEAR_COMBINATION_2 (i1, ..., i(n-1))
+     *  2. let d = in'-in = (c1-c2)/a
+     *      a. |d| < U-L
+     *      b. d is an integer
+     */
+    bool StrongSIVTest(const ArrayAccess& access1, const ArrayAccess& access2) {
+        for (int index = 0; index < access1.arrayIndexAccesses.size(); ++index) {
+            ArrayIndexAccess indexAccess1 = access1.arrayIndexAccesses[index];
+            ArrayIndexAccess indexAccess2 = access2.arrayIndexAccesses[index];
+            int free_coef = indexAccess1.freeCoef - indexAccess2.freeCoef;
+            std::vector<IndexAccess> linear_difference;
+            bool different_linear_combination = false;
+            for (int i = 0; i < indexAccess1.linearCombination.size() - 1; ++i) {
+                int coef = indexAccess1.linearCombination[i].coef - indexAccess2.linearCombination[i].coef;
+                if (coef != 0) {
+                    different_linear_combination = true;
+                    break;
+                }
+            }
+            if (different_linear_combination)
+                continue;
+            if (indexAccess1.linearCombination.size() > 0) {
+                int last_index = indexAccess1.linearCombination.size() - 1;
+                int coef1 = indexAccess1.linearCombination[last_index].coef;
+                int coef2 = indexAccess2.linearCombination[last_index].coef;
+                if (coef1 != coef2)
+                    continue;
+                if (free_coef % coef1 != 0)
+                    return true;
+                int d = free_coef / coef1;
+                if (d < 0)
+                    d = -d;
+                if (indexAccess1.linearCombination[last_index].bounds.isKnown) {
+                    if (d > indexAccess1.linearCombination[last_index].bounds.upperBound - indexAccess1.linearCombination[last_index].bounds.lowerBound)
+                        return true;
+                }
+            }
+        }
         return false;
     }
 
@@ -338,7 +383,7 @@ namespace {
 
     bool isSafeParallelizable(const ArrayAccess& access1, const ArrayAccess& access2) {
         // TODO: implement the four tests
-         return BanerjeeTest(access1, access2) || test2(access1, access2) || test3(access1, access2) || test4(access1, access2);
+         return BanerjeeTest(access1, access2) || StrongSIVTest(access1, access2) || test3(access1, access2) || test4(access1, access2);
     }
 
     struct LoopParallelization : PassInfoMixin<LoopParallelization> {
