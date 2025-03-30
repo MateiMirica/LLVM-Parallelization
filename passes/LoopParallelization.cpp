@@ -59,6 +59,8 @@ namespace {
                 std::string Start = extractEquation(AddRec->getStart(), SE);
                 std::string Step = extractEquation(AddRec->getStepRecurrence(SE), SE);
                 std::string LoopVar = getLoopHeaderAsString(AddRec->getLoop());
+                if (Start == "UnknownExpr" || Step == "UnknownExpr" || LoopVar == "UnknownExpr")
+                    return "UnknownExpr";
                 return Start + " + " + Step + " * " + LoopVar;
             } else {
                 return "UnknownExpr";
@@ -85,6 +87,8 @@ namespace {
     }
 
     int countArrayDimensions(Type *ty) {
+        if (!ty)
+            return -1;
         int dims = 0;
         while (auto *arrayTy = dyn_cast<ArrayType>(ty)) {
             dims++;
@@ -290,6 +294,8 @@ namespace {
         for (int index = 0; index < access1.arrayIndexAccesses.size(); ++index) {
             ArrayIndexAccess indexAccess1 = access1.arrayIndexAccesses[index];
             ArrayIndexAccess indexAccess2 = access2.arrayIndexAccesses[index];
+            if (!indexAccess1.isKnown || !indexAccess2.isKnown)
+                continue;
             int lb = indexAccess1.freeCoef - indexAccess2.freeCoef, ub = indexAccess1.freeCoef - indexAccess2.freeCoef;
             std::vector<IndexAccess> linear_difference;
             bool unknown_boundary = false;
@@ -341,6 +347,8 @@ namespace {
         for (int index = 0; index < access1.arrayIndexAccesses.size(); ++index) {
             ArrayIndexAccess indexAccess1 = access1.arrayIndexAccesses[index];
             ArrayIndexAccess indexAccess2 = access2.arrayIndexAccesses[index];
+            if (!indexAccess1.isKnown || !indexAccess2.isKnown)
+                continue;
             int free_coef = indexAccess1.freeCoef - indexAccess2.freeCoef;
             std::vector<IndexAccess> linear_difference;
             bool different_linear_combination = false;
@@ -378,6 +386,8 @@ namespace {
         for (int index = 0; index < access1.arrayIndexAccesses.size(); ++index) {
             ArrayIndexAccess indexAccess1 = access1.arrayIndexAccesses[index];
             ArrayIndexAccess indexAccess2 = access2.arrayIndexAccesses[index];
+            if (!indexAccess1.isKnown || !indexAccess2.isKnown)
+                continue;
             if (indexAccess1.freeCoef != indexAccess2.freeCoef)
                 return false;
             for (int i = 0; i < indexAccess1.linearCombination.size(); ++i) {
@@ -391,14 +401,17 @@ namespace {
     bool GCDTest(const ArrayAccess& access1, const ArrayAccess& access2) {
         auto arrayIndexAccesses1 = access1.arrayIndexAccesses;
         auto arrayIndexAccesses2 = access2.arrayIndexAccesses;
-        unsigned int currentIndex = arrayIndexAccesses1.size() - 1;
         std::vector<int> coefficients;
         int gcd;
 
         for(int i = 0;i < access1.arrayIndexAccesses.size(); i++)
         {
+            if (!arrayIndexAccesses1[i].isKnown || !arrayIndexAccesses2[i].isKnown)
+                continue;
+
             auto linearCombination1 = arrayIndexAccesses1[i].linearCombination;
             auto linearCombination2 = arrayIndexAccesses2[i].linearCombination;
+            int currentIndex = linearCombination1.size() - 1;
             int freeRemainingCoef = arrayIndexAccesses2[i].freeCoef - arrayIndexAccesses1[i].freeCoef;
 
             for(int j = 0;j < access1.arrayIndexAccesses[i].linearCombination.size();j++)
@@ -434,6 +447,8 @@ namespace {
         auto arrayIndexAccesses2 = access2.arrayIndexAccesses;
         for(int i = 0;i < access1.arrayIndexAccesses.size(); i++)
         {
+            if (!arrayIndexAccesses1[i].isKnown || !arrayIndexAccesses2[i].isKnown)
+                continue;
             bool onlyFreeCoefficients = true;
             auto linearCombination1 = arrayIndexAccesses1[i].linearCombination;
             auto linearCombination2 = arrayIndexAccesses2[i].linearCombination;
@@ -472,6 +487,8 @@ namespace {
             std::unordered_map<Value*, Value*> baseMap;
             std::vector<ArrayAccess> arrayAccesses;
 
+            bool skip_loop = false;
+
             for (BasicBlock *BB : L.blocks()) {
                 for (Instruction &I : *BB)
                 {
@@ -480,6 +497,8 @@ namespace {
                         Value *ptrOperand = Store->getOperand(1);
                         Value *base = getBasePointer(ptrOperand, baseMap);
                         int totalDims = countArrayDimensions(extractTopLevelArrayType(base));
+                        if (totalDims == -1) // ptr param
+                            skip_loop = true;
                         std::vector<std::string> accesses = extractArrayIndexAccess(ptrOperand, SE, totalDims, /* print = */ false);
                         ArrayAccess arrayAccess;
                         arrayAccess.baseAccess = base;
@@ -496,6 +515,8 @@ namespace {
                         Value *ptrOperand = Load->getOperand(0);
                         Value *base = getBasePointer(ptrOperand, baseMap);
                         int totalDims = countArrayDimensions(extractTopLevelArrayType(base));
+                        if (totalDims == -1) // ptr param
+                            skip_loop = true;
                         std::vector<std::string> accesses = extractArrayIndexAccess(ptrOperand, SE, totalDims, /* print = */ false);
                         ArrayAccess arrayAccess;
                         arrayAccess.baseAccess = base;
@@ -517,13 +538,17 @@ namespace {
             }
 
             bool isParallelizable = true;
-            for (int i = 0; i < arrayAccesses.size(); ++i) {
-                for (int j = i + 1; j < arrayAccesses.size(); ++j) {
-                    if (arrayAccesses[i].baseAccess == arrayAccesses[j].baseAccess &&
+            if (!skip_loop) {
+                for (int i = 0; i < arrayAccesses.size(); ++i) {
+                    for (int j = i + 1; j < arrayAccesses.size(); ++j) {
+                        if (arrayAccesses[i].baseAccess == arrayAccesses[j].baseAccess &&
                             (!arrayAccesses[i].type || !arrayAccesses[j].type)) {
-                        isParallelizable &= isSafeParallelizable(arrayAccesses[i], arrayAccesses[j]);
+                            isParallelizable &= isSafeParallelizable(arrayAccesses[i], arrayAccesses[j]);
+                        }
                     }
                 }
+            } else {
+                isParallelizable = false;
             }
 
             if (isParallelizable) {
