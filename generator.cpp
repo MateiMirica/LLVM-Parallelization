@@ -32,7 +32,7 @@ int main() {
             }
         }
         for (int i = 1; i <= 5; ++i) {
-            if (distr3(gen) > 0) {
+            if (distr3(gen) == 1) {
                 string coef = to_string(distr2(gen));
                 s2 += "+" + coef + "*i" + to_string(i);
             }
