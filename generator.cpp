@@ -8,7 +8,7 @@ using namespace std;
 int main() {
 
     for (int file_num = 1; file_num <= 1000; ++file_num) {
-        string filename = "../tests/file_" + to_string(file_num) + ".cpp";
+        string filename = "../tests4/file_" + to_string(file_num) + ".cpp";
         freopen(filename.c_str(), "w", stdout);
         std::random_device rd;
         std::mt19937 gen(rd());
@@ -32,7 +32,7 @@ int main() {
             }
         }
         for (int i = 1; i <= 5; ++i) {
-            if (distr3(gen) == 1) {
+            if (distr3(gen) > 0) {
                 string coef = to_string(distr2(gen));
                 s2 += "+" + coef + "*i" + to_string(i);
             }
