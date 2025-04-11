@@ -39,7 +39,9 @@ ninja && \
 
 Running the pass (MacOS):
 
-`cmake -G Ninja -DLLVM_DIR=($PATH_TO_LLVM)/build/lib/cmake/llvm .. && ninja && \
+```
+cmake -G Ninja -DLLVM_DIR=($PATH_TO_LLVM)/build/lib/cmake/llvm .. && ninja && \
 clang -S -g -emit-llvm -Xclang -disable-O0-optnone ../test.cpp -o ../test.ll && \
 ($PATH_TO_LLVM)build/bin/opt -S -passes="mem2reg" ../test.ll -o ../test_mem2reg.ll && \
-($PATH_TO_LLVM)/build/bin/opt -load-pass-plugin ./libLoopParallelization.dylib -passes="loop-parallelization" -disable-output ../test_mem2reg.ll`
+($PATH_TO_LLVM)/build/bin/opt -load-pass-plugin ./libLoopParallelization.dylib -passes="loop-parallelization" -disable-output ../test_mem2reg.ll
+```
