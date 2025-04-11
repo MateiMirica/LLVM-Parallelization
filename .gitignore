@@ -2,3 +2,4 @@
 !passes/
 !passes/LoopParallelization.cpp
 !README.md
+!CMakeLists.txt
