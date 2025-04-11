@@ -2,3 +2,6 @@
 !passes/
 !passes/LoopParallelization.cpp
 !README.md
+!generator.cpp
+!tests/
+!tests/**
