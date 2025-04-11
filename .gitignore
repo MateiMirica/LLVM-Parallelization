@@ -5,3 +5,4 @@
 !generator.cpp
 !tests/
 !tests/**
+!CMakeLists.txt
