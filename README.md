@@ -16,9 +16,18 @@ detect much more safe loops than the Zero and Strong Single Index Variable tests
 This tool provides a practical foundation to static-analysis based parallelization, and can be further developed to analyze whole
 loop nests, to automatically parallelize them, rather than just annotating, to add more dependency tests, and more.
 
-LLVM Version: 20.1
+The project was tested using LLVM Version: 20
 
-Running the project (Linux):
+The first step is to clone the LLVM repository (https://github.com/llvm/llvm-project).
+
+Then, create a build directory and enter it.
+```
+mkdir build && cd build
+```
+
+To run the pass on a file (test.cpp for example), run the following command:
+
+Running the pass (Linux):
 ```
 cmake -G Ninja -DLLVM_DIR=\$HOME/llvm-install/lib/cmake/llvm .. && \
 ninja && \
@@ -27,12 +36,10 @@ ninja && \
 \$HOME/llvm-install/bin/opt -S -passes='simplifycfg,loop-simplify' ../test_mem2reg.ll -o ../test_loop.ll && \
 \$HOME/llvm-install/bin/opt -load-pass-plugin ./libPCPParallization.so -passes="pcp-parallizer" -disable-output ../test_loop.ll
 ```
-In this command, ../test.cpp represents the file in which the pass analyzes loops for parallelization.
 
+Running the pass (MacOS):
 
-Run command (Matei M.)
-
-`cmake -G Ninja -DLLVM_DIR=/Users/mateimirica/Desktop/llvm-project/build/lib/cmake/llvm .. && ninja && \
+`cmake -G Ninja -DLLVM_DIR=($PATH_TO_LLVM)/build/lib/cmake/llvm .. && ninja && \
 clang -S -g -emit-llvm -Xclang -disable-O0-optnone ../test.cpp -o ../test.ll && \
-/Users/mateimirica/Desktop/llvm-project/build/bin/opt -S -passes="mem2reg" ../test.ll -o ../test_mem2reg.ll &&\
-/Users/mateimirica/Desktop/llvm-project/build/bin/opt -load-pass-plugin ./libLoopParallelization.dylib -passes="loop-parallelization" -disable-output ../test_mem2reg.ll`
+($PATH_TO_LLVM)build/bin/opt -S -passes="mem2reg" ../test.ll -o ../test_mem2reg.ll &&\
+($PATH_TO_LLVM)/build/bin/opt -load-pass-plugin ./libLoopParallelization.dylib -passes="loop-parallelization" -disable-output ../test_mem2reg.ll`
