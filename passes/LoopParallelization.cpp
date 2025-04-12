@@ -401,13 +401,13 @@ namespace {
     bool GCDTest(const ArrayAccess& access1, const ArrayAccess& access2) {
         auto arrayIndexAccesses1 = access1.arrayIndexAccesses;
         auto arrayIndexAccesses2 = access2.arrayIndexAccesses;
-        std::vector<int> coefficients;
         int gcd;
 
         for(int i = 0;i < access1.arrayIndexAccesses.size(); i++)
         {
             if (!arrayIndexAccesses1[i].isKnown || !arrayIndexAccesses2[i].isKnown)
                 continue;
+            std::vector<int> coefficients;
 
             auto linearCombination1 = arrayIndexAccesses1[i].linearCombination;
             auto linearCombination2 = arrayIndexAccesses2[i].linearCombination;
